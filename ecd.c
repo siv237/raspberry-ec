@@ -8,37 +8,56 @@
 #define A1 BASE+1
 #define A2 BASE+2
 #define A3 BASE+3
-float varVolt = 5,varProcess = 0.0001,Pc = 0.0,G = 1.0,P = 0.0,Xp = 0.0,Zp = 0.0,Xe = 0.0;
-
-// Калибровка ЕС
-float ec1= 0.01;    // Фактическое значение ЕС при нижнем пределе
-float x1=16;        // Показания АЦП при нижнем значении ЕС
-float ec2= 4;     // Фактическое значение ЕС при верхнем пределе
-float x2=75;        // Показания АЦП при верхнем значении ЕС
-float Ft=0;  // Минимальная частота опроса для снятия показаний кГц
-void clrscr(void);
+#include <string.h>
+#include <libconfig.h>
+#include <math.h> 
+double varVolt,varProcess,Pc,G,P,Xp,Zp,Xe;
 
 
-void clrscr(void)
+///////////////////////////////////
+//////        Функции        //////
+///////////////////////////////////
+
+//Получение температуры
+
+float ds18b20(char* device)
 {
-char a[80];
-printf("\033[2J"); /* Clear the entire screen. */
-printf("\033[0;0f"); /* Move cursor to the top left hand corner
-*/
+int nString=0;
+FILE *file;
+char arr[80];
+char *chksum;
+char path[80];
+strcpy(path,"/sys/bus/w1/devices/28-");
+strcat(path, device);
+strcat(path, "/w1_slave");
+
+file = fopen(path, "rt");
+while (fgets (arr, 80, file) != NULL)
+	{
+	nString++;
+	if(nString == 1){
+
+			if(strstr(arr,"YES") != NULL)
+				{
+				chksum = "TRUE";
+				}
+				else
+				{
+				chksum = "FALSE";
+				}
+			}
+
+	if(nString == 2){
+		if(chksum = "TRUE")
+				{
+				fclose(file);
+  				strtok (arr,"=");
+				return atof(strtok (NULL, "="))/1000;
+				}
+			}
+	}
 }
 
-float filter(float val) {  //функция фильтрации
-  
-  Pc = P + varProcess;
-  G = Pc/(Pc + varVolt);
-  P = (1-G)*Pc;
-  Xp = Xe;
-  Zp = Xp;
-  Xe = G*(val-Zp)+Xp; // "фильтрованное" значение
- 
-  return(Xe);
-
-}
 
 
 // Функция калибровки
@@ -50,123 +69,118 @@ float fCalibration(float x1, float ec1, float x2, float ec2, float x){
 }
 
 
-
-
-int main(int argc, char * argv[])
-{
-
-         int i;
-         for( i = 0 ; i < argc; i++) {
-         }
-         if(argc == 1) {
-                 printf("Default settings\n");
-         }
-         else
-{
-x1 = atof(argv[1]);
-ec1 = atof(argv[2]);
-x2 = atof(argv[3]);
-ec2 = atof(argv[4]);
-Ft = atof(argv[5]);
-//ec1=argv[2];
-//x2=argv[3];
-//ec2=argv[4];
+// Функция фильтрации
+float filter(float val) { 
+  Pc = P + varProcess;
+  G = Pc/(Pc + varVolt);
+  P = (1-G)*Pc;
+  Xp = Xe;
+  Zp = Xp;
+  Xe = G*(val-Zp)+Xp; // "фильтрованное" значение
+  return(Xe);
 
 }
 
+// Функция замера
+long fa,fb,fc,fd;
+float fMetering(int d1, int d2, int a, int maxr){
+float f;
+
+    pinMode (d1, OUTPUT) ;
+    pinMode (d2, OUTPUT) ;
+
+int r=0;
+fa=0;
+fb=0;
+while (r<maxr){
+r++;
+   digitalWrite (d1, HIGH) ;
+   fa=fa+analogRead(64+a);
+   digitalWrite (d1, LOW) ;
+
+   digitalWrite (d2, HIGH) ;
+   fb=fb+analogRead(64+a);
+   digitalWrite (d2, LOW) ;
+}
 
 
-//                 printf("x1: %s\n", argv[1]);
+    pinMode (d1, INPUT) ;
+    pinMode (d2, INPUT) ;
 
+float dac=(255-((float)fa/r))+((float)fb/r)/2;
+float polarity=(255-((float)fa/r))-((float)fb/r);
+//float kalman=filter(dac);
+return dac;
+}
+
+
+void clrscr(void)
+{
+char a[80];
+printf("\033[2J"); /* Clear the entire screen. */
+printf("\033[0;0f"); /* Move cursor to the top left hand corner
+*/
+}
+
+
+///////////////////////////////////////////////////////////////////
+int main(){
+double x1,x2,ec1,ec2,tk;
+char *tdev;
 
     wiringPiSetup();
     pcf8591Setup(BASE,Address);
-    float vlp,vlm,vl,fvl=0,n,nn,ec0;
+// Получение переменных из конига
 
+printf("Read config /etc/ecd.conf...\n");
 while (1){
-long t = millis();
 
-    pinMode (12, OUTPUT) ;
-    pinMode (13, OUTPUT) ;
+  config_t cfg;
+  config_init(&cfg);
+
+  if (config_read_file(&cfg, "/etc/ecd.conf"))
+	{
+	// Для колибровки
+	config_lookup_float(&cfg, "x1", &x1);
+	config_lookup_float(&cfg, "x2", &x2);
+	config_lookup_float(&cfg, "ec1", &ec1);
+	config_lookup_float(&cfg, "ec2", &ec2);
+	config_lookup_float(&cfg, "tk", &tk);
+	config_lookup_string(&cfg, "tdev", &tdev);
+	// Для фильтрации
+	if(!varVolt)config_lookup_float(&cfg, "varVolt", &varVolt);
+	if(!varProcess)config_lookup_float(&cfg, "varProcess", &varProcess);
+	if(!Pc)config_lookup_float(&cfg, "Pc", &Pc);
+	if(!G)config_lookup_float(&cfg, "G", &G);
+	if(!P)config_lookup_float(&cfg, "P", &P);
+	if(!Xp)config_lookup_float(&cfg, "Xp", &Xp);
+	if(!Zp)config_lookup_float(&cfg, "Zp", &Zp);
+	if(!Xe)config_lookup_float(&cfg, "Xe", &Xe);
+	}
 
 
-n=0;
-nn=0;
-vlm=0;
-vlp=0;
-long j=0;
-long ga=1200,gg=60;
-    while(n<ga)
-
-       {
-        nn=0;
-
-       
-        digitalWrite (12, HIGH) ;
-        vlp = vlp+analogRead(A3);
-        digitalWrite (12, LOW) ;
-
-        digitalWrite (13, HIGH) ;
-        vlm = vlm+analogRead(A3);
-        digitalWrite (13, LOW) ;
-        n++;
-
-        while (nn<gg)
-            {
-
-             digitalWrite (12, HIGH) ;
-             digitalWrite (12, LOW) ;
-             digitalWrite (13, HIGH) ;
-             digitalWrite (13, LOW) ;
-             nn++;
-
-            }
-
-       }
-t=(millis()-t);
-long tt=((ga*gg)+ga)*2;
-    pinMode (12, INPUT) ;
-    pinMode (13, INPUT) ;
-
-float F=tt/(float)t;
-if(F>Ft){
-
-vlp=vlp/n;
-vlm=255-(vlm/n);
-vl=(vlp+vlm)/2;
- if(fvl==0){Xe=vl;}
-fvl=filter(vl);
-
-ec0=fCalibration(x1,ec1,x2,ec2,fvl);
-clrscr();
-printf("Middle: %3.3f\n",vl);
-printf("Polarity: %3.3f\n",(vlp-vlm));
-printf("Kalman: %3.3f\n",fvl);
-printf("EC: %3.3f\n",ec0);
-printf("Time: %dms\n",t);
-printf("Count: %d\n",tt);
-printf("Frequency: %3.3fkHz\n",F);
-printf("Calibration x1=%3.2f, ec1=%3.2f, x2=%3.2f, ec2=%3.2f, Ft=%3.2f\n",x1,ec1,x2,ec2);
+float temper=ds18b20(tdev);
+float dac=fMetering(12,13,2,5000);
+float kdac=filter(dac);
+float ec0=fCalibration(x1,ec1,x2,ec2,kdac);
+float ec=ec0/(1-0.02*(temper-25));
+printf("Temper:%3.3f, dac:%3.3f, kdac:%3.3f, ec0:%3.3f, ec:%3.3f\n",temper,dac,kdac,ec0,ec);
 
 FILE *f = fopen("/run/shm/ecd", "wt");
-fprintf(f,"Middle: %3.3f\n",vl);
-fprintf(f,"Polarity: %3.3f\n",(vlp-vlm));
-fprintf(f,"Kalman: %3.3f\n",fvl);
-fprintf(f,"EC: %3.3f\n",ec0);
-fprintf(f,"Time: %dms\n",t);
-fprintf(f,"Count: %d\n",tt);
-fprintf(f,"Frequency: %3.3fkHz\n",tt/(float)t);
-fprintf(f,"Calibration: x1=%3.2f, ec1=%3.2f, x2=%3.2f, ec2=%3.2f, Ft=%3.2f\n",x1,ec1,x2,ec2,Ft);
+fprintf(f,"Middle: %3.3f\n",dac);
+fprintf(f,"Kalman: %3.3f\n",kdac);
+fprintf(f,"EC0: %3.3f\n",ec0);
+fprintf(f,"EC: %3.3f\n",ec);
+fprintf(f,"Temperature: %3.3f\n",temper);
 
 fflush(f);
 
 fclose(f); 
-}
-else
-{
-printf("Frequency: %3.3fkHz < %3.3fkHz\n",tt/(float)t,Ft);
 
+
+//printf("%3.3f\n",fCalibration(x1,ec1,x2,ec2,dac));
 }
+return 0;
 }
-}
+
 

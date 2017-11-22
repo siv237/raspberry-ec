@@ -114,14 +114,6 @@ return dac;
 }
 
 
-void clrscr(void)
-{
-char a[80];
-printf("\033[2J"); /* Clear the entire screen. */
-printf("\033[0;0f"); /* Move cursor to the top left hand corner
-*/
-}
-
 
 ///////////////////////////////////////////////////////////////////
 int main(){
@@ -166,7 +158,7 @@ while (1){
 	if(!Xp)config_lookup_float(&cfg, "Xp", &Xp);
 	if(!Zp)config_lookup_float(&cfg, "Zp", &Zp);
 	//if(!Xe)config_lookup_float(&cfg, "Xe", &Xe);
-	if(!Xe){Xe=fMetering(d1,d2,a,cont);printf("Xe:%3.3f\n",Xe);}
+	if(!Xe){delay(5000);Xe=fMetering(d1,d2,a,cont);printf("Xe:%3.3f\n",Xe);}
 
 
 	}

@@ -83,13 +83,13 @@ float filter(float val) {
 
 // Функция замера
 long fa,fb,fc,fd;
-float fMetering(int d1, int d2, int a, int maxr){
+float fMetering(int d1, int d2, int a, long maxr){
 float f;
 
     pinMode (d1, OUTPUT) ;
     pinMode (d2, OUTPUT) ;
 
-int r=0;
+long r=0;
 fa=0;
 fb=0;
 while (r<maxr){
@@ -126,6 +126,8 @@ printf("\033[0;0f"); /* Move cursor to the top left hand corner
 ///////////////////////////////////////////////////////////////////
 int main(){
 double x1,x2,ec1,ec2,tk;
+int d1,d2,a;
+long cont;
 char *tdev;
 
     wiringPiSetup();
@@ -133,6 +135,8 @@ char *tdev;
 // Получение переменных из конига
 
 printf("Read config /etc/ecd.conf...\n");
+
+
 while (1){
 
   config_t cfg;
@@ -147,6 +151,12 @@ while (1){
 	config_lookup_float(&cfg, "ec2", &ec2);
 	config_lookup_float(&cfg, "tk", &tk);
 	config_lookup_string(&cfg, "tdev", &tdev);
+	//Параметры опроса
+	config_lookup_int(&cfg, "d1", &d1);
+	config_lookup_int(&cfg, "d2", &d2);
+	config_lookup_int(&cfg, "a", &a);
+	config_lookup_int(&cfg, "cont", &cont);
+
 	// Для фильтрации
 	if(!varVolt)config_lookup_float(&cfg, "varVolt", &varVolt);
 	if(!varProcess)config_lookup_float(&cfg, "varProcess", &varProcess);
@@ -155,15 +165,18 @@ while (1){
 	if(!P)config_lookup_float(&cfg, "P", &P);
 	if(!Xp)config_lookup_float(&cfg, "Xp", &Xp);
 	if(!Zp)config_lookup_float(&cfg, "Zp", &Zp);
-	if(!Xe)config_lookup_float(&cfg, "Xe", &Xe);
+	//if(!Xe)config_lookup_float(&cfg, "Xe", &Xe);
+	if(!Xe){Xe=fMetering(d1,d2,a,cont);printf("Xe:%3.3f\n",Xe);}
+
+
 	}
 
 
 float temper=ds18b20(tdev);
-float dac=fMetering(12,13,2,5000);
+float dac=fMetering(d1,d2,a,cont);
 float kdac=filter(dac);
 float ec0=fCalibration(x1,ec1,x2,ec2,kdac);
-float ec=ec0/(1-0.02*(temper-25));
+float ec=ec0/(1-tk*(temper-25));
 printf("Temper:%3.3f, dac:%3.3f, kdac:%3.3f, ec0:%3.3f, ec:%3.3f\n",temper,dac,kdac,ec0,ec);
 
 FILE *f = fopen("/run/shm/ecd", "wt");

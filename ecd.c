@@ -4,10 +4,6 @@
 #include <stdlib.h>
 #define Address 0x48
 #define BASE 64
-#define A0 BASE+0
-#define A1 BASE+1
-#define A2 BASE+2
-#define A3 BASE+3
 #include <string.h>
 #include <libconfig.h>
 #include <math.h> 
@@ -136,7 +132,7 @@ while (1){
 
   if (config_read_file(&cfg, "/etc/ecd.conf"))
 	{
-	// Для колибровки
+	// Для калибровки
 	config_lookup_float(&cfg, "x1", &x1);
 	config_lookup_float(&cfg, "x2", &x2);
 	config_lookup_float(&cfg, "ec1", &ec1);
@@ -168,8 +164,8 @@ float temper=ds18b20(tdev);
 float dac=fMetering(d1,d2,a,cont);
 float kdac=filter(dac);
 float ec0=fCalibration(x1,ec1,x2,ec2,kdac);
-float ec=ec0/(1-tk*(temper-25));
-printf("Temper:%3.3f, dac:%3.3f, kdac:%3.3f, ec0:%3.3f, ec:%3.3f\n",temper,dac,kdac,ec0,ec);
+float ec=ec0/(1+tk*(temper-25));
+//printf("Temper:%3.3f, dac:%3.3f, kdac:%3.3f, ec0:%3.3f, ec:%3.3f\n",temper,dac,kdac,ec0,ec);
 
 FILE *f = fopen("/run/shm/ecd", "wt");
 fprintf(f,"Middle: %3.3f\n",dac);
@@ -183,7 +179,7 @@ fflush(f);
 fclose(f); 
 
 
-//printf("%3.3f\n",fCalibration(x1,ec1,x2,ec2,dac));
+printf("%3.3f\n",fCalibration(x1,ec1,x2,ec2,dac));
 }
 return 0;
 }

@@ -44,6 +44,7 @@ status)
                 printf "%s\n" "Process dead but pidfile exists"
             else
                 echo "Running"
+		cat /run/shm/ecd
             fi
         else
             printf "%s\n" "Service not running"

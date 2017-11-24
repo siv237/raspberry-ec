@@ -7,14 +7,18 @@
 #include <string.h>
 #include <libconfig.h>
 #include <math.h> 
-double varVolt,varProcess,Pc,G,P,Xp,Zp,Xe;
+#include <time.h>
 
+double varVolt,varProcess,Pc,G,P,Xp,Zp,Xe;
+struct tm *u;
+char s1[40] = { 0 }, s2[40] = { 0 };
+float polarity;
 
 ///////////////////////////////////
 //////        Функции        //////
 ///////////////////////////////////
 
-//Получение температуры
+// Получение температуры
 
 float ds18b20(char* device)
 {
@@ -78,9 +82,9 @@ float filter(float val) {
 }
 
 // Функция замера
-long fa,fb,fc,fd;
 float fMetering(int d1, int d2, int a, long maxr){
 float f;
+long fa,fb;
 
     pinMode (d1, OUTPUT) ;
     pinMode (d2, OUTPUT) ;
@@ -104,7 +108,7 @@ r++;
     pinMode (d2, INPUT) ;
 
 float dac=(255-((float)fa/r))+((float)fb/r)/2;
-float polarity=(255-((float)fa/r))-((float)fb/r);
+polarity=(255-((float)fa/r))-((float)fb/r);
 //float kalman=filter(dac);
 return dac;
 }
@@ -115,8 +119,8 @@ return dac;
 int main(){
 double x1,x2,ec1,ec2,tk;
 int d1,d2,a;
-long cont;
-char *tdev;
+long cont,wait;
+char *tdev,*log;
 
     wiringPiSetup();
     pcf8591Setup(BASE,Address);
@@ -139,11 +143,13 @@ while (1){
 	config_lookup_float(&cfg, "ec2", &ec2);
 	config_lookup_float(&cfg, "tk", &tk);
 	config_lookup_string(&cfg, "tdev", &tdev);
+	config_lookup_string(&cfg, "log", &log);
 	//Параметры опроса
 	config_lookup_int(&cfg, "d1", &d1);
 	config_lookup_int(&cfg, "d2", &d2);
 	config_lookup_int(&cfg, "a", &a);
 	config_lookup_int(&cfg, "cont", &cont);
+	config_lookup_int(&cfg, "wait", &wait);
 
 	// Для фильтрации
 	if(!varVolt)config_lookup_float(&cfg, "varVolt", &varVolt);
@@ -156,7 +162,6 @@ while (1){
 	//if(!Xe)config_lookup_float(&cfg, "Xe", &Xe);
 	if(!Xe){delay(5000);Xe=fMetering(d1,d2,a,cont);printf("Xe:%3.3f\n",Xe);}
 
-
 	}
 
 
@@ -167,19 +172,32 @@ float ec0=fCalibration(x1,ec1,x2,ec2,kdac);
 float ec=ec0/(1+tk*(temper-25));
 //printf("Temper:%3.3f, dac:%3.3f, kdac:%3.3f, ec0:%3.3f, ec:%3.3f\n",temper,dac,kdac,ec0,ec);
 
-FILE *f = fopen("/run/shm/ecd", "wt");
-fprintf(f,"Middle: %3.3f\n",dac);
-fprintf(f,"Kalman: %3.3f\n",kdac);
-fprintf(f,"EC0: %3.3f\n",ec0);
-fprintf(f,"EC: %3.3f\n",ec);
-fprintf(f,"Temperature: %3.3f\n",temper);
-
-fflush(f);
-
-fclose(f); 
+// Фиксация времени
+const time_t timer = time(NULL);
+u = localtime(&timer);
+strftime(s1, 80, "%Y/%m/%d %H:%M:%S", u);
 
 
-printf("%3.3f\n",fCalibration(x1,ec1,x2,ec2,dac));
+
+FILE *f1 = fopen("/run/shm/ecd", "wt");
+fprintf(f1,"Middle: %3.3f\n",dac);
+fprintf(f1,"Kalman: %3.3f\n",kdac);
+fprintf(f1,"EC0: %3.3f\n",ec0);
+fprintf(f1,"EC: %3.3f\n",ec);
+fprintf(f1,"Temperature: %3.3f\n",temper);
+fflush(f1);
+fclose(f1); 
+
+// Запись в лог
+FILE *f2 = fopen(log, "at");
+fprintf(f2,"%s;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f\n",s1,dac,polarity,kdac,ec0,ec,temper);
+fflush(f2);
+fclose(f2); 
+
+
+//printf("%3.3f\n",fCalibration(x1,ec1,x2,ec2,dac));
+
+delay(wait*1000);
 }
 return 0;
 }

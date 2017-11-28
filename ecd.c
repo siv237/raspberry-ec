@@ -9,10 +9,17 @@
 #include <math.h> 
 #include <time.h>
 
+
+
+
+
 double varVolt,varProcess,Pc,G,P,Xp,Zp,Xe;
 struct tm *u;
 char s1[40] = { 0 }, s2[40] = { 0 };
 float polarity;
+long fa,fb;
+double fa0,fb0;
+long t;
 
 ///////////////////////////////////
 //////        Функции        //////
@@ -84,7 +91,6 @@ float filter(float val) {
 // Функция замера
 float fMetering(int d1, int d2, int a, long maxr){
 float f;
-long fa,fb;
 
     pinMode (d1, OUTPUT) ;
     pinMode (d2, OUTPUT) ;
@@ -92,23 +98,39 @@ long fa,fb;
 long r=0;
 fa=0;
 fb=0;
-while (r<maxr){
+t = millis();
+while (r<=maxr){
 r++;
+
    digitalWrite (d1, HIGH) ;
    fa=fa+analogRead(64+a);
    digitalWrite (d1, LOW) ;
+/*
+long rr=0;
+while (rr<10000){
+   digitalWrite (d1, HIGH) ;
+   digitalWrite (d1, LOW) ;
+   digitalWrite (d2, HIGH) ;
+   digitalWrite (d2, LOW) ;
+   rr++;}
+*/
 
    digitalWrite (d2, HIGH) ;
    fb=fb+analogRead(64+a);
    digitalWrite (d2, LOW) ;
-}
 
+
+}
+t=millis()-t;
+//if (t > 1.42 * maxr){fa=fa0;fb=fb0;}
 
     pinMode (d1, INPUT) ;
     pinMode (d2, INPUT) ;
 
-float dac=(255-((float)fa/r))+((float)fb/r)/2;
-polarity=(255-((float)fa/r))-((float)fb/r);
+fa0=255-((float)fa/r);
+fb0=(float)fb/r;
+float dac=(fa0+fb0)/2;
+polarity=fa0-fb0;
 //float kalman=filter(dac);
 return dac;
 }
@@ -150,7 +172,6 @@ while (1){
 	config_lookup_int(&cfg, "a", &a);
 	config_lookup_int(&cfg, "cont", &cont);
 	config_lookup_int(&cfg, "wait", &wait);
-
 	// Для фильтрации
 	if(!varVolt)config_lookup_float(&cfg, "varVolt", &varVolt);
 	if(!varProcess)config_lookup_float(&cfg, "varProcess", &varProcess);
@@ -159,8 +180,8 @@ while (1){
 	if(!P)config_lookup_float(&cfg, "P", &P);
 	if(!Xp)config_lookup_float(&cfg, "Xp", &Xp);
 	if(!Zp)config_lookup_float(&cfg, "Zp", &Zp);
-	//if(!Xe)config_lookup_float(&cfg, "Xe", &Xe);
-	if(!Xe){delay(5000);Xe=fMetering(d1,d2,a,cont);printf("Xe:%3.3f\n",Xe);}
+	if(!Xe)config_lookup_float(&cfg, "Xe", &Xe);
+//	if(!Xe){delay(5000);Xe=fMetering(d1,d2,a,5000);printf("Xe:%3.3f\n",Xe);}
 
 	}
 
@@ -168,6 +189,8 @@ while (1){
 float temper=ds18b20(tdev);
 float dac=fMetering(d1,d2,a,cont);
 float kdac=filter(dac);
+if (fabs((kdac-dac)/dac)*100>20){Xe=dac;kdac=dac;}
+
 float ec0=fCalibration(x1,ec1,x2,ec2,kdac);
 float ec=ec0/(1+tk*(temper-25));
 //printf("Temper:%3.3f, dac:%3.3f, kdac:%3.3f, ec0:%3.3f, ec:%3.3f\n",temper,dac,kdac,ec0,ec);
@@ -185,12 +208,17 @@ fprintf(f1,"Kalman: %3.3f\n",kdac);
 fprintf(f1,"EC0: %3.3f\n",ec0);
 fprintf(f1,"EC: %3.3f\n",ec);
 fprintf(f1,"Temperature: %3.3f\n",temper);
+fprintf(f1,"t: %d\n",t);
+fprintf(f1,"t/n: %3.3f\n",(float)t/cont);
+fprintf(f1,"fa: %3.3f\n",fa0);
+fprintf(f1,"fb: %3.3f\n",fb0);
+fprintf(f1,"Freq: %3.3f\n",(float)cont/t);
 fflush(f1);
 fclose(f1); 
 
 // Запись в лог
 FILE *f2 = fopen(log, "at");
-fprintf(f2,"%s;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f\n",s1,dac,polarity,kdac,ec0,ec,temper);
+fprintf(f2,"%s;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f\n",s1,dac,polarity,kdac,ec0,ec,temper,255-(float)fa/cont,(float)fb/cont,(float)cont/t);
 fflush(f2);
 fclose(f2); 
 

@@ -9,7 +9,7 @@ ecd: ecd.o
 ecd.o: ecd.c
 	gcc $(PACKAGES_CFLAGS) -c -o ecd.o ecd.c 
 install:
-	gcc -o ecd ecd.o -lbcm2835 -lwiringPi -lm -Wall $(PACKAGES_LIBS)
+	make ecd
 	@echo "Building complite...\n"
 	@cp ecd /usr/bin/
 	@cp conf/ecd.conf /etc/
@@ -18,14 +18,14 @@ install:
 	@chmod +x /etc/init.d/ecd
 	@update-rc.d ecd defaults
 reinstall:
-	gcc -o ecd ecd.o -lbcm2835 -lwiringPi -lm -Wall $(PACKAGES_LIBS)
-	@echo "Building complite...\n"
-	@service ecd stop
-	@echo "Reinstall service ecd...\n"
-	@cp ecd /usr/bin/
-	@cp conf/ecd.conf /etc/
-	@echo "Create init.d scripts..."
-	@cp conf/ecd /etc/init.d/
-	@chmod +x /etc/init.d/ecd
-	@update-rc.d ecd defaults
-	@service ecd start
+	make ecd
+	echo "Building complite...\n"
+	service ecd stop
+	echo "Reinstall service ecd...\n"
+	cp ecd /usr/bin/
+	cp conf/ecd.conf /etc/
+	echo "Create init.d scripts..."
+	cp conf/ecd /etc/init.d/
+	chmod +x /etc/init.d/ecd
+	update-rc.d ecd defaults
+	service ecd start

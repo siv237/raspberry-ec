@@ -9,17 +9,13 @@
 #include <math.h> 
 #include <time.h>
 
-
-
-
-
 double varVolt,varProcess,Pc,G,P,Xp,Zp,Xe;
 struct tm *u;
 char s1[40] = { 0 }, s2[40] = { 0 };
 float polarity;
 long fa,fb;
 double fa0,fb0;
-long t;
+long t,r,rr;
 
 ///////////////////////////////////
 //////        Функции        //////
@@ -85,53 +81,46 @@ float filter(float val) {
   Zp = Xp;
   Xe = G*(val-Zp)+Xp; // "фильтрованное" значение
   return(Xe);
-
 }
 
 // Функция замера
 float fMetering(int d1, int d2, int a, long maxr){
-float f;
 
+float f;
     pinMode (d1, OUTPUT) ;
     pinMode (d2, OUTPUT) ;
 
-long r=0;
 fa=0;
 fb=0;
 t = millis();
+
+r=0;
 while (r<=maxr){
 r++;
-
-   digitalWrite (d1, HIGH) ;
+   digitalWrite (d1, LOW) ;   digitalWrite (d2, HIGH);
+   digitalWrite (d1, HIGH);   digitalWrite (d2, LOW);
    fa=fa+analogRead(64+a);
-   digitalWrite (d1, LOW) ;
-/*
-long rr=0;
-while (rr<10000){
-   digitalWrite (d1, HIGH) ;
-   digitalWrite (d1, LOW) ;
-   digitalWrite (d2, HIGH) ;
-   digitalWrite (d2, LOW) ;
-   rr++;}
-*/
-
-   digitalWrite (d2, HIGH) ;
-   fb=fb+analogRead(64+a);
-   digitalWrite (d2, LOW) ;
-
-
 }
+
+r=0;
+while (r<=maxr){
+r++;
+   digitalWrite (d2, LOW); digitalWrite (d1, HIGH);
+   digitalWrite (d2, HIGH); digitalWrite (d1, LOW) ;
+   fb=fb+analogRead(64+a);
+}
+
 t=millis()-t;
-//if (t > 1.42 * maxr){fa=fa0;fb=fb0;}
 
-    pinMode (d1, INPUT) ;
-    pinMode (d2, INPUT) ;
+    pinMode (d1, INPUT);
+    pinMode (d2, INPUT);
 
-fa0=255-((float)fa/r);
-fb0=(float)fb/r;
+fa0=255-((float)fa/maxr);
+fb0=(float)fb/maxr;
 float dac=(fa0+fb0)/2;
 polarity=fa0-fb0;
-//float kalman=filter(dac);
+
+
 return dac;
 }
 
@@ -201,24 +190,24 @@ u = localtime(&timer);
 strftime(s1, 80, "%Y/%m/%d %H:%M:%S", u);
 
 
-
 FILE *f1 = fopen("/run/shm/ecd", "wt");
+fprintf(f1,"Time: %s\n",s1);
 fprintf(f1,"Middle: %3.3f\n",dac);
 fprintf(f1,"Kalman: %3.3f\n",kdac);
 fprintf(f1,"EC0: %3.3f\n",ec0);
 fprintf(f1,"EC: %3.3f\n",ec);
 fprintf(f1,"Temperature: %3.3f\n",temper);
 fprintf(f1,"t: %d\n",t);
-fprintf(f1,"t/n: %3.3f\n",(float)t/cont);
 fprintf(f1,"fa: %3.3f\n",fa0);
 fprintf(f1,"fb: %3.3f\n",fb0);
-fprintf(f1,"Freq: %3.3f\n",(float)cont/t);
+fprintf(f1,"fa-fb: %3.3f\n",fa0-fb0);
+fprintf(f1,"Freq: %3.3f\n",(float)cont*2/t);
 fflush(f1);
 fclose(f1); 
 
 // Запись в лог
 FILE *f2 = fopen(log, "at");
-fprintf(f2,"%s;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f\n",s1,dac,polarity,kdac,ec0,ec,temper,255-(float)fa/cont,(float)fb/cont,(float)cont/t);
+fprintf(f2,"%s;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f;%3.3f\n",s1,dac,polarity,kdac,ec0,ec,temper,255-(float)fa/cont,(float)fb/cont,(float)cont*2/t);
 fflush(f2);
 fclose(f2); 
 

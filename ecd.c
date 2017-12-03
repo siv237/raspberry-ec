@@ -13,7 +13,7 @@ double varVolt,varProcess,Pc,G,P,Xp,Zp,Xe;
 struct tm *u;
 char s1[40] = { 0 }, s2[40] = { 0 };
 float polarity;
-long fa,fb;
+float fa,fb;
 double fa0,fb0;
 long t,r,rr;
 
@@ -97,26 +97,33 @@ t = millis();
 r=0;
 while (r<=maxr){
 r++;
-   digitalWrite (d1, LOW) ;   digitalWrite (d2, HIGH);
-   digitalWrite (d1, HIGH);   digitalWrite (d2, LOW);
-   fa=fa+analogRead(64+a);
+   digitalWrite (d1, HIGH);  
+   fa=(fa+analogRead(64+a))/2;
+   digitalWrite (d1, LOW) ;
+
+   digitalWrite (d2, HIGH);  
+   fb=(fb+analogRead(64+a))/2;
+   digitalWrite (d2, LOW) ;
+
+   digitalWrite (d1, HIGH);  
+   digitalWrite (d1, LOW) ;
+
+   digitalWrite (d2, HIGH);  
+   digitalWrite (d2, LOW) ;
+
 }
 
-r=0;
-while (r<=maxr){
-r++;
-   digitalWrite (d2, LOW); digitalWrite (d1, HIGH);
-   digitalWrite (d2, HIGH); digitalWrite (d1, LOW) ;
-   fb=fb+analogRead(64+a);
-}
+
+
+
 
 t=millis()-t;
 
     pinMode (d1, INPUT);
     pinMode (d2, INPUT);
 
-fa0=255-((float)fa/maxr);
-fb0=(float)fb/maxr;
+fa0=255-fa;
+fb0=fb;
 float dac=(fa0+fb0)/2;
 polarity=fa0-fb0;
 
@@ -178,7 +185,7 @@ while (1){
 float temper=ds18b20(tdev);
 float dac=fMetering(d1,d2,a,cont);
 float kdac=filter(dac);
-if (fabs((kdac-dac)/dac)*100>20){Xe=dac;kdac=dac;}
+if (fabs((kdac-dac)/dac)*100>50){Xe=dac;kdac=dac;}
 
 float ec0=fCalibration(x1,ec1,x2,ec2,kdac);
 float ec=ec0/(1+tk*(temper-25));

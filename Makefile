@@ -11,21 +11,25 @@ ecd.o: ecd.c
 install:
 	make ecd
 	@echo "Building complite...\n"
+	@killall ecd
 	@cp ecd /usr/bin/
 	@cp conf/ecd.conf /etc/
 	@echo "Create init.d scripts..."
 	@cp conf/ecd /etc/init.d/
 	@chmod +x /etc/init.d/ecd
 	@update-rc.d ecd defaults
+	@service ecd start
+
 reinstall:
 	make ecd
 	echo "Building complite...\n"
 	service ecd stop
-	echo "Reinstall service ecd...\n"
 	cp ecd /usr/bin/
+	service ecd start
+
+config:
 	cp conf/ecd.conf /etc/
 	echo "Create init.d scripts..."
 	cp conf/ecd /etc/init.d/
 	chmod +x /etc/init.d/ecd
 	update-rc.d ecd defaults
-	service ecd start

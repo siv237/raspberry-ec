@@ -13,13 +13,15 @@ double varVolt,varProcess,Pc,G,P,Xp,Zp,Xe;
 struct tm *u;
 char s1[40] = { 0 }, s2[40] = { 0 };
 float polarity;
-float fa,fb;
+float fa,fb,far,fbr;
 double fa0,fb0;
 long t,r,rr;
+float kdac=0;
 
 ///////////////////////////////////
 //////        Функции        //////
 ///////////////////////////////////
+
 
 // Получение температуры
 
@@ -87,22 +89,26 @@ float filter(float val) {
 float fMetering(int d1, int d2, int a, long maxr){
 
 float f;
+do{
+
     pinMode (d1, OUTPUT) ;
     pinMode (d2, OUTPUT) ;
+
 
 fa=0;
 fb=0;
 t = millis();
 
+
 r=0;
 while (r<=maxr){
 r++;
    digitalWrite (d1, HIGH);  
-   fa=(fa+analogRead(64+a))/2;
+   far=analogRead(64+a);
    digitalWrite (d1, LOW) ;
 
    digitalWrite (d2, HIGH);  
-   fb=(fb+analogRead(64+a))/2;
+   fbr=analogRead(64+a);
    digitalWrite (d2, LOW) ;
 
    digitalWrite (d1, HIGH);  
@@ -111,10 +117,10 @@ r++;
    digitalWrite (d2, HIGH);  
    digitalWrite (d2, LOW) ;
 
+fb=(fbr+fb)/2;
+fa=(far+fa)/2;
+
 }
-
-
-
 
 
 t=millis()-t;
@@ -124,11 +130,17 @@ t=millis()-t;
 
 fa0=255-fa;
 fb0=fb;
+
+}while (fabs(fa0-fb0)>1);
+
+
 float dac=(fa0+fb0)/2;
 polarity=fa0-fb0;
 
+//}while (t<10000);
 
 return dac;
+
 }
 
 
@@ -181,11 +193,17 @@ while (1){
 
 	}
 
-
+float freq=(float)cont*2/t;
 float temper=ds18b20(tdev);
 float dac=fMetering(d1,d2,a,cont);
-float kdac=filter(dac);
-if (fabs((kdac-dac)/dac)*100>50){Xe=dac;kdac=dac;}
+//float kdac=filter(dac);
+//if (fabs(fa-fb)8){
+		 if (freq>1.1){ 
+			kdac = filter(dac); }
+//}
+//}
+
+if (fabs((kdac-dac)/dac)*100>80){Xe=dac;kdac=dac;}
 
 float ec0=fCalibration(x1,ec1,x2,ec2,kdac);
 float ec=ec0/(1+tk*(temper-25));
@@ -207,8 +225,8 @@ fprintf(f1,"Temperature: %3.3f\n",temper);
 fprintf(f1,"t: %d\n",t);
 fprintf(f1,"fa: %3.3f\n",fa0);
 fprintf(f1,"fb: %3.3f\n",fb0);
-fprintf(f1,"fa-fb: %3.3f\n",fa0-fb0);
-fprintf(f1,"Freq: %3.3f\n",(float)cont*2/t);
+fprintf(f1,"fa-fb: %3.3f\n",fabs(fa0-fb0));
+fprintf(f1,"Freq: %3.3f\n",freq);
 fflush(f1);
 fclose(f1); 
 

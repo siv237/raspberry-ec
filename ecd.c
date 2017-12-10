@@ -131,7 +131,7 @@ t=millis()-t;
 fa0=255-fa;
 fb0=fb;
 
-}while (fabs(fa0-fb0)>1);
+}while (fabs(fa0-fb0)>0.05);
 
 
 float dac=(fa0+fb0)/2;
@@ -198,7 +198,7 @@ float temper=ds18b20(tdev);
 float dac=fMetering(d1,d2,a,cont);
 //float kdac=filter(dac);
 //if (fabs(fa-fb)8){
-		 if (freq>1.1){ 
+		 if (freq>1){ 
 			kdac = filter(dac); }
 //}
 //}
